@@ -1,14 +1,16 @@
-// RSS Feed URLs (via rss2json - free API, no key required)
+// RSS Feed URLs - 联联社(연합뉴스) 分类 + Google News 综合
 const FEEDS = {
     headlines: 'https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko',
-    politics: 'https://news.google.com/rss/search?hl=ko&gl=KR&ceid=KR:ko&q=%EC%A0%95%EC%B9%98',
-    economy: 'https://news.google.com/rss/search?hl=ko&gl=KR&ceid=KR:ko&q=%EA%B2%BD%EC%A0%9C',
-    society: 'https://news.google.com/rss/search?hl=ko&gl=KR&ceid=KR:ko&q=%EC%82%AC%ED%9A%8C'
+    politics: 'https://www.yna.co.kr/rss/politics.xml',
+    economy: 'https://www.yna.co.kr/rss/economy.xml',
+    society: 'https://www.yna.co.kr/rss/society.xml'
 };
 
 const API_BASE = 'https://api.rss2json.com/v1/api.json?rss_url=';
-// CORS proxy for GitHub Pages (bypasses cross-origin restrictions)
-const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+const CORS_PROXIES = [
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?'
+];
 
 const loadingEl = document.getElementById('loading');
 const errorEl = document.getElementById('error');
@@ -19,10 +21,20 @@ let currentFeed = 'headlines';
 
 async function fetchNews(feedKey) {
     const apiUrl = `${API_BASE}${encodeURIComponent(FEEDS[feedKey])}`;
-    const url = `${CORS_PROXY}${encodeURIComponent(apiUrl)}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Network error');
-    return response.json();
+    let lastErr;
+    for (const proxy of CORS_PROXIES) {
+        try {
+            const url = proxy === CORS_PROXIES[1] 
+                ? `${proxy}${encodeURIComponent(apiUrl)}` 
+                : `${proxy}${encodeURIComponent(apiUrl)}`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Network error');
+            return await response.json();
+        } catch (err) {
+            lastErr = err;
+        }
+    }
+    throw lastErr;
 }
 
 function formatDate(dateStr) {
