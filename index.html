@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>한국 뉴스 | Korea News</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <h1 class="logo">
+                <span class="logo-ko">한국 뉴스</span>
+                <span class="logo-en">Korea News</span>
+            </h1>
+            <p class="tagline">실시간 한국 주요 뉴스</p>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="controls">
+            <div class="category-tabs">
+                <button class="tab active" data-feed="headlines">전체 헤드라인</button>
+                <button class="tab" data-feed="politics">정치</button>
+                <button class="tab" data-feed="economy">경제</button>
+                <button class="tab" data-feed="society">사회</button>
+            </div>
+            <button class="refresh-btn" id="refreshBtn" title="새로고침">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 4v6h-6M1 20v-6h6"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+                <span>새로고침</span>
+            </button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>뉴스 로딩 중...</p>
+        </div>
+
+        <div class="error" id="error" style="display: none;">
+            <p>뉴스를 불러올 수 없습니다. 잠시 후 다시 시도해 주세요.</p>
+        </div>
+
+        <section class="news-grid" id="newsContainer">
+            <!-- News cards will be inserted here -->
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>데이터 출처: Google News Korea · RSS 피드 기반</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
