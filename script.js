@@ -8,6 +8,7 @@ const FEEDS = {
 
 const API_BASE = 'https://api.rss2json.com/v1/api.json?rss_url=';
 const CORS_PROXIES = [
+    'https://api.codetabs.com/v1/proxy?quest=',
     'https://api.allorigins.win/raw?url=',
     'https://corsproxy.io/?'
 ];
@@ -19,15 +20,15 @@ const refreshBtn = document.getElementById('refreshBtn');
 
 let currentFeed = 'headlines';
 
-async function fetchNews(feedKey) {
-    const apiUrl = `${API_BASE}${encodeURIComponent(FEEDS[feedKey])}`;
+async function fetchWithProxy(apiUrl) {
     let lastErr;
     for (const proxy of CORS_PROXIES) {
         try {
-            const url = proxy === CORS_PROXIES[1] 
-                ? `${proxy}${encodeURIComponent(apiUrl)}` 
-                : `${proxy}${encodeURIComponent(apiUrl)}`;
-            const response = await fetch(url);
+            const url = proxy + encodeURIComponent(apiUrl);
+            const ctrl = new AbortController();
+            const timeout = setTimeout(() => ctrl.abort(), 15000);
+            const response = await fetch(url, { signal: ctrl.signal });
+            clearTimeout(timeout);
             if (!response.ok) throw new Error('Network error');
             return await response.json();
         } catch (err) {
@@ -35,6 +36,18 @@ async function fetchNews(feedKey) {
         }
     }
     throw lastErr;
+}
+
+async function fetchNews(feedKey) {
+    try {
+        const res = await fetch(`news-data/${feedKey}.json`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.status === 'ok' && data.items?.length) return data;
+        }
+    } catch (_) {}
+    const apiUrl = `${API_BASE}${encodeURIComponent(FEEDS[feedKey])}`;
+    return fetchWithProxy(apiUrl);
 }
 
 function formatDate(dateStr) {
@@ -89,10 +102,16 @@ async function loadNews(feedKey = currentFeed) {
     refreshBtn.disabled = true;
 
     try {
-        const data = await fetchNews(feedKey);
+        let data = await fetchNews(feedKey);
 
         if (data.status !== 'ok' || !data.items || data.items.length === 0) {
-            throw new Error('No items');
+            if (feedKey !== 'headlines') {
+                data = await fetchNews('headlines');
+                feedKey = 'headlines';
+            }
+            if (!data || data.status !== 'ok' || !data.items || data.items.length === 0) {
+                throw new Error('No items');
+            }
         }
 
         renderNews(data.items);
