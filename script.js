@@ -12,6 +12,16 @@ let allItems = [];
 let currentSource = 'all';
 let currentKeyword = '';
 
+function getDataCandidates() {
+    const list = ['data/magazines.json'];
+    const segments = window.location.pathname.split('/').filter(Boolean);
+    if (segments.length > 0) {
+        list.push(`/${segments[0]}/data/magazines.json`);
+    }
+    list.push('/data/magazines.json');
+    return [...new Set(list)];
+}
+
 function sourceLabel(source) {
     if (source === 'shuge') return '书格';
     if (source === 'zh-wikipedia') return '中文维基百科';
@@ -31,6 +41,20 @@ function formatYear(item) {
     return '年份未知';
 }
 
+function normalizeLink(link) {
+    const raw = safeText(link).trim();
+    if (!raw) return '#';
+    try {
+        const url = new URL(raw, window.location.origin);
+        if (url.protocol === 'http:' || url.protocol === 'https:') {
+            return url.href;
+        }
+    } catch (_) {
+        // ignore invalid URL
+    }
+    return '#';
+}
+
 function renderCards(items) {
     if (!items.length) {
         resourceContainer.innerHTML = '<div class="empty">没有匹配到资源，请尝试其他关键词。</div>';
@@ -43,7 +67,7 @@ function renderCards(items) {
         const summary = escapeHtml(safeText(item.summary) || '暂无摘要');
         const year = escapeHtml(formatYear(item));
         const source = escapeHtml(sourceLabel(item.source));
-        const link = safeText(item.link) || '#';
+        const link = normalizeLink(item.link);
         return `
             <article class="card">
                 <div class="card-meta">
@@ -52,7 +76,7 @@ function renderCards(items) {
                 </div>
                 <h3>${title}</h3>
                 <p>${summary}</p>
-                <a href="${encodeURI(link)}" target="_blank" rel="noopener noreferrer">查看原文</a>
+                <a href="${link}" target="_blank" rel="noopener noreferrer">查看原文</a>
             </article>
         `;
     }).join('');
@@ -76,9 +100,10 @@ function hideLoading() {
     loadingEl.style.display = 'none';
 }
 
-function showError() {
+function showError(message = '未能加载资源数据，请稍后重试。') {
     loadingEl.style.display = 'none';
     errorEl.style.display = 'block';
+    errorEl.innerHTML = `<p>${escapeHtml(message)}</p>`;
 }
 
 function applyFilters() {
@@ -104,16 +129,38 @@ async function loadData() {
     showLoading();
     refreshBtn.disabled = true;
     try {
-        const response = await fetch('data/magazines.json', { cache: 'no-cache' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
+        if (window.location.protocol === 'file:') {
+            throw new Error('当前是 file:// 打开方式，请使用 HTTP 服务器或 GitHub Pages 访问。');
+        }
+
+        const candidates = getDataCandidates();
+        let data = null;
+        let lastError = null;
+
+        for (const url of candidates) {
+            try {
+                const response = await fetch(`${url}?v=${Date.now()}`, { cache: 'no-cache' });
+                if (!response.ok) {
+                    throw new Error(`${url} 返回 HTTP ${response.status}`);
+                }
+                data = await response.json();
+                break;
+            } catch (err) {
+                lastError = err;
+            }
+        }
+
+        if (!data) {
+            throw lastError || new Error('无法读取数据文件');
+        }
+
         allItems = Array.isArray(data.items) ? data.items : [];
         updateSummary(data.meta || {});
         hideLoading();
         applyFilters();
     } catch (error) {
         console.error(error);
-        showError();
+        showError(`加载失败：${error.message || '未知错误'}`);
     } finally {
         refreshBtn.disabled = false;
     }
