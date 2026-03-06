@@ -41,6 +41,20 @@ function formatYear(item) {
     return '年份未知';
 }
 
+function normalizeLink(link) {
+    const raw = safeText(link).trim();
+    if (!raw) return '#';
+    try {
+        const url = new URL(raw, window.location.origin);
+        if (url.protocol === 'http:' || url.protocol === 'https:') {
+            return url.href;
+        }
+    } catch (_) {
+        // ignore invalid URL
+    }
+    return '#';
+}
+
 function renderCards(items) {
     if (!items.length) {
         resourceContainer.innerHTML = '<div class="empty">没有匹配到资源，请尝试其他关键词。</div>';
@@ -53,7 +67,7 @@ function renderCards(items) {
         const summary = escapeHtml(safeText(item.summary) || '暂无摘要');
         const year = escapeHtml(formatYear(item));
         const source = escapeHtml(sourceLabel(item.source));
-        const link = safeText(item.link) || '#';
+        const link = normalizeLink(item.link);
         return `
             <article class="card">
                 <div class="card-meta">
@@ -62,7 +76,7 @@ function renderCards(items) {
                 </div>
                 <h3>${title}</h3>
                 <p>${summary}</p>
-                <a href="${encodeURI(link)}" target="_blank" rel="noopener noreferrer">查看原文</a>
+                <a href="${link}" target="_blank" rel="noopener noreferrer">查看原文</a>
             </article>
         `;
     }).join('');
