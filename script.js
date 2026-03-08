@@ -30,6 +30,63 @@ function buildApiUrl(path) {
     return `${apiBase}${path}`;
 }
 
+/** 无后端时使用 Internet Archive CORS API 直接搜索（解决 GitHub Pages 等静态托管 404） */
+const IA_CORS_SEARCH = "https://cors.archive.org/advancedsearch.php";
+const IA_IMG_BASE = "https://archive.org/services/img/";
+const IA_DETAILS_BASE = "https://archive.org/details/";
+
+function normalizeMagazineEntry(doc) {
+    const identifier = doc.identifier || "";
+    let title = doc.title;
+    if (Array.isArray(title)) title = title[0] || "无标题";
+    title = title || "无标题";
+    let creator = doc.creator;
+    if (Array.isArray(creator)) creator = creator[0] || "未知";
+    creator = creator || "未知";
+    let date = doc.date;
+    if (Array.isArray(date)) date = date[0] || "";
+    date = date || "";
+    let description = doc.description;
+    if (Array.isArray(description)) description = description[0] || "";
+    description = (description || "").slice(0, 200);
+    let subject = doc.subject;
+    if (Array.isArray(subject)) subject = subject.slice(0, 5).join(", ");
+    subject = subject || "";
+    const thumbnail = identifier ? `${IA_IMG_BASE}${identifier}` : "";
+    const webpage_url = identifier ? `${IA_DETAILS_BASE}${identifier}` : "";
+    return { id: identifier, title, creator, date, description, subject, thumbnail, webpage_url };
+}
+
+async function searchViaCorsApi(query, limit = 18) {
+    const searchQuery1 = `collection:(periodicals OR magazine_rack) ${query}`;
+    const params1 = new URLSearchParams({
+        q: searchQuery1,
+        output: "json",
+        rows: String(limit),
+        fl: "identifier,title,creator,date,description,subject",
+        sort: "date desc",
+    });
+    let resp = await fetch(`${IA_CORS_SEARCH}?${params1}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    let data = await resp.json();
+    let docs = data?.response?.docs ?? [];
+    if (!docs.length) {
+        const searchQuery2 = `mediatype:texts ${query}`;
+        const params2 = new URLSearchParams({
+            q: searchQuery2,
+            output: "json",
+            rows: String(limit),
+            fl: "identifier,title,creator,date,description,subject",
+            sort: "date desc",
+        });
+        resp = await fetch(`${IA_CORS_SEARCH}?${params2}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        data = await resp.json();
+        docs = data?.response?.docs ?? [];
+    }
+    return docs.filter((d) => d.identifier).map(normalizeMagazineEntry);
+}
+
 function escapeHtml(text) {
     const div = document.createElement("div");
     div.textContent = text ?? "";
@@ -99,12 +156,16 @@ async function fetchSearch(query) {
     hideError();
     statusText.textContent = `正在搜索：${query}`;
     try {
-        const resp = await fetch(buildApiUrl(`/api/search?q=${encodeURIComponent(query)}&limit=18`));
-        if (!resp.ok) {
-            throw new Error(`HTTP ${resp.status}`);
+        let items;
+        if (apiBase) {
+            const resp = await fetch(buildApiUrl(`/api/search?q=${encodeURIComponent(query)}&limit=18`));
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            items = Array.isArray(data.items) ? data.items : [];
+        } else {
+            items = await searchViaCorsApi(query, 18);
         }
-        const data = await resp.json();
-        lastItems = Array.isArray(data.items) ? data.items : [];
+        lastItems = items;
         renderCards(lastItems);
         statusText.textContent = `搜索完成：${query}`;
     } catch (err) {
@@ -131,10 +192,4 @@ quickButtons.forEach((button) => {
     });
 });
 
-const runningOnGithubPages = window.location.hostname.endsWith("github.io");
-if (runningOnGithubPages && !apiBase) {
-    statusText.textContent = "当前是 GitHub Pages 静态站，请先配置后端 API。";
-    showError("请在网址后追加 ?api=https://你的后端域名 ，例如：.../?api=https://your-backend.example.com");
-} else {
-    fetchSearch("Life Magazine");
-}
+fetchSearch("Life Magazine");

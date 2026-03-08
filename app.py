@@ -2,6 +2,7 @@
 历史杂志抓取网站 - 从 Internet Archive 抓取并展示历史杂志
 """
 import asyncio
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -9,6 +10,9 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 
 app = FastAPI(title="历史杂志馆", version="1.0.0")
+
+# 静态文件目录：与 app.py 同目录，避免因工作目录不同导致 404
+STATIC_DIR = Path(__file__).resolve().parent
 
 HTTP_CLIENT = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
 
@@ -143,17 +147,17 @@ async def magazine_info(identifier: str) -> JSONResponse:
 
 @app.get("/", include_in_schema=False)
 async def index() -> FileResponse:
-    return FileResponse("index.html")
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/styles.css", include_in_schema=False)
 async def styles() -> FileResponse:
-    return FileResponse("styles.css")
+    return FileResponse(STATIC_DIR / "styles.css")
 
 
 @app.get("/script.js", include_in_schema=False)
 async def script() -> FileResponse:
-    return FileResponse("script.js")
+    return FileResponse(STATIC_DIR / "script.js")
 
 
 @app.on_event("shutdown")
