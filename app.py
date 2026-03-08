@@ -1,175 +1,95 @@
+"""
+历史杂志抓取网站 - 从 Internet Archive 抓取并展示历史杂志
+"""
 import asyncio
-import time
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
-from yt_dlp import YoutubeDL
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse, JSONResponse
+
+app = FastAPI(title="历史杂志馆", version="1.0.0")
+
+HTTP_CLIENT = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
+
+IA_SEARCH_URL = "https://archive.org/advancedsearch.php"
+IA_IMG_BASE = "https://archive.org/services/img/"
+IA_DETAILS_BASE = "https://archive.org/details/"
 
 
-app = FastAPI(title="YouTube Mirror", version="1.0.0")
+def _normalize_magazine_entry(doc: dict[str, Any]) -> dict[str, Any]:
+    """将 Internet Archive 文档转为前端使用的格式"""
+    identifier = doc.get("identifier") or ""
+    title = doc.get("title")
+    if isinstance(title, list):
+        title = title[0] if title else "无标题"
+    title = title or "无标题"
+    creator = doc.get("creator")
+    if isinstance(creator, list):
+        creator = creator[0] if creator else "未知"
+    creator = creator or "未知"
+    date = doc.get("date")
+    if isinstance(date, list):
+        date = date[0] if date else ""
+    date = date or ""
+    description = doc.get("description")
+    if isinstance(description, list):
+        description = description[0] if description else ""
+    description = (description or "")[:200]
+    subject = doc.get("subject")
+    if isinstance(subject, list):
+        subject = ", ".join(str(s) for s in subject[:5]) if subject else ""
+    subject = subject or ""
 
-HTTP_CLIENT = httpx.AsyncClient(timeout=60.0, follow_redirects=True)
-STREAM_CACHE_TTL_SECONDS = 10 * 60
-stream_cache: dict[str, dict[str, Any]] = {}
+    cover = f"{IA_IMG_BASE}{identifier}" if identifier else ""
+    details_url = f"{IA_DETAILS_BASE}{identifier}" if identifier else ""
 
-
-def _pick_thumbnail(entry: dict[str, Any]) -> str:
-    thumbs = entry.get("thumbnails") or []
-    if thumbs:
-        thumbs = sorted(
-            [item for item in thumbs if item.get("url")],
-            key=lambda item: (item.get("width") or 0) * (item.get("height") or 0),
-            reverse=True,
-        )
-        if thumbs:
-            return thumbs[0]["url"]
-    thumb = entry.get("thumbnail")
-    if thumb:
-        return str(thumb)
-    video_id = entry.get("id")
-    if video_id:
-        return f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
-    return ""
-
-
-def _format_duration(seconds: Any) -> str:
-    if not isinstance(seconds, int):
-        return "未知"
-    h, rem = divmod(seconds, 3600)
-    m, s = divmod(rem, 60)
-    if h:
-        return f"{h:d}:{m:02d}:{s:02d}"
-    return f"{m:d}:{s:02d}"
-
-
-def _normalize_search_entry(entry: dict[str, Any]) -> dict[str, Any]:
     return {
-        "id": entry.get("id"),
-        "title": entry.get("title") or "无标题",
-        "uploader": entry.get("uploader") or entry.get("channel") or "未知频道",
-        "duration": _format_duration(entry.get("duration")),
-        "view_count": entry.get("view_count"),
-        "thumbnail": _pick_thumbnail(entry),
-        "webpage_url": entry.get("url")
-        if str(entry.get("url", "")).startswith("http")
-        else f"https://www.youtube.com/watch?v={entry.get('id')}",
-        "published": entry.get("upload_date"),
+        "id": identifier,
+        "title": title,
+        "creator": creator,
+        "date": date,
+        "description": description,
+        "subject": subject,
+        "thumbnail": cover,
+        "webpage_url": details_url,
     }
 
 
-def _search_videos_sync(query: str, limit: int) -> list[dict[str, Any]]:
-    opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "skip_download": True,
-        "extract_flat": "in_playlist",
+async def _search_magazines(query: str, limit: int) -> list[dict[str, Any]]:
+    """从 Internet Archive 搜索历史杂志"""
+    # 搜索 periodicals 集合，并加入用户关键词
+    search_query = f"collection:(periodicals OR magazine_rack) {query}"
+    params = {
+        "q": search_query,
+        "output": "json",
+        "rows": limit,
+        "fl": "identifier,title,creator,date,description,subject",
+        "sort": "date desc",
     }
-    with YoutubeDL(opts) as ydl:
-        data = ydl.extract_info(f"ytsearch{limit}:{query}", download=False) or {}
-    entries = data.get("entries") or []
-    return [_normalize_search_entry(item) for item in entries if item.get("id")]
+    try:
+        resp = await HTTP_CLIENT.get(IA_SEARCH_URL, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:
+        raise RuntimeError(f"Internet Archive 请求失败: {exc}") from exc
 
+    docs = data.get("response", {}).get("docs", [])
+    if not docs:
+        # 若 periodicals 无结果，尝试 broader texts 搜索
+        fallback_params = {
+            "q": f"mediatype:texts {query}",
+            "output": "json",
+            "rows": limit,
+            "fl": "identifier,title,creator,date,description,subject",
+            "sort": "date desc",
+        }
+        resp = await HTTP_CLIENT.get(IA_SEARCH_URL, params=fallback_params)
+        resp.raise_for_status()
+        data = resp.json()
+        docs = data.get("response", {}).get("docs", [])
 
-def _sort_key_for_format(fmt: dict[str, Any]) -> tuple[int, int, float, int]:
-    ext = 1 if fmt.get("ext") == "mp4" else 0
-    return (
-        fmt.get("height") or 0,
-        fmt.get("width") or 0,
-        float(fmt.get("tbr") or 0),
-        ext,
-    )
-
-
-def _pick_stream_format(formats: list[dict[str, Any]], format_id: str | None) -> dict[str, Any]:
-    playable = [
-        item
-        for item in formats
-        if item.get("url") and item.get("vcodec") != "none" and item.get("acodec") != "none"
-    ]
-    if format_id:
-        for item in playable:
-            if str(item.get("format_id")) == format_id:
-                return item
-    if not playable:
-        raise ValueError("没有可用的音视频合流格式")
-    return sorted(playable, key=_sort_key_for_format, reverse=True)[0]
-
-
-def _video_info_sync(video_id: str) -> dict[str, Any]:
-    opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "skip_download": True,
-    }
-    with YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False) or {}
-
-    formats = info.get("formats") or []
-    selected = _pick_stream_format(formats, None)
-    return {
-        "id": video_id,
-        "title": info.get("title") or "无标题",
-        "description": info.get("description") or "",
-        "uploader": info.get("uploader") or info.get("channel") or "未知频道",
-        "duration": _format_duration(info.get("duration")),
-        "view_count": info.get("view_count"),
-        "thumbnail": _pick_thumbnail(info),
-        "default_format_id": selected.get("format_id"),
-        "playable_formats": [
-            {
-                "format_id": item.get("format_id"),
-                "ext": item.get("ext"),
-                "height": item.get("height"),
-                "fps": item.get("fps"),
-                "vcodec": item.get("vcodec"),
-                "acodec": item.get("acodec"),
-            }
-            for item in sorted(
-                [
-                    item
-                    for item in formats
-                    if item.get("url")
-                    and item.get("vcodec") != "none"
-                    and item.get("acodec") != "none"
-                ],
-                key=_sort_key_for_format,
-                reverse=True,
-            )
-        ],
-    }
-
-
-def _resolve_stream_sync(video_id: str, format_id: str | None) -> dict[str, Any]:
-    opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "skip_download": True,
-    }
-    with YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False) or {}
-    selected = _pick_stream_format(info.get("formats") or [], format_id)
-    return {
-        "url": selected.get("url"),
-        "http_headers": selected.get("http_headers") or {},
-    }
-
-
-async def resolve_stream(video_id: str, format_id: str | None) -> dict[str, Any]:
-    key = f"{video_id}:{format_id or ''}"
-    now = time.time()
-    cached = stream_cache.get(key)
-    if cached and now - cached["ts"] <= STREAM_CACHE_TTL_SECONDS:
-        return cached
-
-    resolved = await asyncio.to_thread(_resolve_stream_sync, video_id, format_id)
-    if not resolved.get("url"):
-        raise HTTPException(status_code=502, detail="未能解析视频流地址")
-
-    payload = {"url": resolved["url"], "http_headers": resolved["http_headers"], "ts": now}
-    stream_cache[key] = payload
-    return payload
+    return [_normalize_magazine_entry(d) for d in docs if d.get("identifier")]
 
 
 @app.get("/api/health")
@@ -178,67 +98,47 @@ async def health() -> dict[str, str]:
 
 
 @app.get("/api/search")
-async def search_videos(
+async def search_magazines(
     q: str = Query(..., min_length=1, max_length=100),
     limit: int = Query(18, ge=1, le=36),
 ) -> JSONResponse:
     try:
-        items = await asyncio.to_thread(_search_videos_sync, q, limit)
+        items = await _search_magazines(q, limit)
         return JSONResponse({"query": q, "count": len(items), "items": items})
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"搜索失败：{exc}") from exc
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
-@app.get("/api/video/{video_id}")
-async def video_info(video_id: str) -> JSONResponse:
+@app.get("/api/magazine/{identifier}")
+async def magazine_info(identifier: str) -> JSONResponse:
+    """获取单本杂志的详情（可选，用于详情页）"""
+    url = f"https://archive.org/metadata/{identifier}"
     try:
-        info = await asyncio.to_thread(_video_info_sync, video_id)
-        return JSONResponse(info)
+        resp = await HTTP_CLIENT.get(url)
+        resp.raise_for_status()
+        data = resp.json()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"获取视频信息失败：{exc}") from exc
+        raise HTTPException(status_code=502, detail=f"获取杂志详情失败: {exc}") from exc
 
+    metadata = data.get("metadata", {})
+    title = metadata.get("title", "无标题")
+    creator = metadata.get("creator", "未知")
+    date = metadata.get("date", "")
+    description = metadata.get("description", "")
+    if isinstance(description, list):
+        description = description[0] if description else ""
+    cover = f"{IA_IMG_BASE}{identifier}"
+    details_url = f"{IA_DETAILS_BASE}{identifier}"
 
-@app.get("/api/stream/{video_id}")
-async def stream_video(video_id: str, request: Request, format_id: str | None = None) -> StreamingResponse:
-    resolved = await resolve_stream(video_id, format_id)
-    headers: dict[str, str] = {}
-    if request.headers.get("range"):
-        headers["Range"] = request.headers["range"]
-
-    for key in ("User-Agent", "Referer", "Origin"):
-        value = resolved["http_headers"].get(key)
-        if value:
-            headers[key] = value
-
-    req = HTTP_CLIENT.build_request("GET", resolved["url"], headers=headers)
-    upstream = await HTTP_CLIENT.send(req, stream=True)
-    if upstream.status_code >= 400:
-        body = (await upstream.aread())[:200]
-        await upstream.aclose()
-        raise HTTPException(status_code=502, detail=f"上游视频流错误：{upstream.status_code} {body!r}")
-
-    proxy_headers: dict[str, str] = {}
-    for key in (
-        "Content-Type",
-        "Content-Length",
-        "Content-Range",
-        "Accept-Ranges",
-        "Cache-Control",
-        "ETag",
-        "Last-Modified",
-    ):
-        value = upstream.headers.get(key)
-        if value:
-            proxy_headers[key] = value
-
-    async def iterator():
-        try:
-            async for chunk in upstream.aiter_bytes():
-                yield chunk
-        finally:
-            await upstream.aclose()
-
-    return StreamingResponse(iterator(), status_code=upstream.status_code, headers=proxy_headers)
+    return JSONResponse({
+        "id": identifier,
+        "title": title,
+        "creator": creator,
+        "date": date,
+        "description": description,
+        "thumbnail": cover,
+        "webpage_url": details_url,
+    })
 
 
 @app.get("/", include_in_schema=False)

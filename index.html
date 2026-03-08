@@ -3,53 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube 镜像站</title>
-    <meta name="description" content="可部署的 YouTube 镜像站：搜索、浏览并通过服务端代理播放视频。">
+    <title>历史杂志馆</title>
+    <meta name="description" content="从 Internet Archive 抓取与展示历史杂志，浏览百年期刊文献。">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <header class="header">
-        <h1>YouTube 镜像站</h1>
-        <p>服务端代理搜索与播放，客户端无需直接访问 YouTube 域名。</p>
+        <h1>历史杂志馆</h1>
+        <p>从 Internet Archive 抓取与展示百年历史杂志，探索期刊文献宝库。</p>
     </header>
 
     <main class="container">
         <section class="search-panel">
             <form id="searchForm">
-                <input id="searchInput" type="text" placeholder="输入关键词，例如：Taylor Swift / 科技新闻 / 纪录片" required>
-                <button id="searchBtn" type="submit">搜索</button>
+                <input id="searchInput" type="text" placeholder="输入关键词，例如：Life Magazine / 民国 / National Geographic" required>
+                <button id="searchBtn" type="submit">搜索杂志</button>
             </form>
             <div class="quick-actions">
-                <button class="quick-btn" data-query="热门音乐">热门音乐</button>
-                <button class="quick-btn" data-query="电影解说">电影解说</button>
-                <button class="quick-btn" data-query="科技评测">科技评测</button>
+                <button class="quick-btn" data-query="Life Magazine">Life Magazine</button>
+                <button class="quick-btn" data-query="National Geographic">National Geographic</button>
+                <button class="quick-btn" data-query="民国期刊">民国期刊</button>
             </div>
         </section>
 
         <section class="status-row">
-            <p id="statusText">输入关键词开始搜索。</p>
+            <p id="statusText">输入关键词开始搜索历史杂志。</p>
             <p>结果数：<strong id="resultCount">0</strong></p>
-        </section>
-
-        <section id="playerPanel" class="player-panel hidden">
-            <div class="player-header">
-                <h2 id="playerTitle">播放器</h2>
-                <button id="closePlayerBtn" type="button">关闭播放器</button>
-            </div>
-            <video id="videoPlayer" controls preload="metadata"></video>
-            <p id="playerMeta"></p>
         </section>
 
         <section id="errorBox" class="error hidden"></section>
         <section id="loading" class="loading hidden">加载中...</section>
-        <section id="videoGrid" class="video-grid"></section>
+        <section id="magazineGrid" class="magazine-grid"></section>
     </main>
 
     <footer class="footer">
-        <p>仅供学习与技术演示，请遵守当地法律法规与版权要求。</p>
+        <p>数据来源于 Internet Archive，仅供学习与研究，请遵守版权法规。</p>
     </footer>
 
     <script src="script.js"></script>

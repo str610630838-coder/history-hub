@@ -4,14 +4,9 @@ const searchBtn = document.getElementById("searchBtn");
 const quickButtons = document.querySelectorAll(".quick-btn");
 const statusText = document.getElementById("statusText");
 const resultCount = document.getElementById("resultCount");
-const videoGrid = document.getElementById("videoGrid");
+const magazineGrid = document.getElementById("magazineGrid");
 const loading = document.getElementById("loading");
 const errorBox = document.getElementById("errorBox");
-const playerPanel = document.getElementById("playerPanel");
-const playerTitle = document.getElementById("playerTitle");
-const playerMeta = document.getElementById("playerMeta");
-const videoPlayer = document.getElementById("videoPlayer");
-const closePlayerBtn = document.getElementById("closePlayerBtn");
 
 let lastItems = [];
 const apiBase = getApiBase();
@@ -20,11 +15,11 @@ function getApiBase() {
     const queryApi = new URLSearchParams(window.location.search).get("api");
     if (queryApi) {
         const normalized = queryApi.replace(/\/+$/, "");
-        window.localStorage.setItem("youtube_api_base", normalized);
+        window.localStorage.setItem("magazine_api_base", normalized);
         return normalized;
     }
 
-    const stored = window.localStorage.getItem("youtube_api_base");
+    const stored = window.localStorage.getItem("magazine_api_base");
     if (stored) {
         return stored.replace(/\/+$/, "");
     }
@@ -57,8 +52,14 @@ function hideError() {
 }
 
 function renderEmpty() {
-    videoGrid.innerHTML = '<div class="error">没有搜索到结果，请换个关键词试试。</div>';
+    magazineGrid.innerHTML = '<div class="error">没有搜索到杂志，请换个关键词试试。</div>';
     resultCount.textContent = "0";
+}
+
+function formatDate(dateStr) {
+    if (!dateStr || typeof dateStr !== "string") return "日期未知";
+    const parts = dateStr.split("-")[0].split(" ");
+    return parts[0] || dateStr;
 }
 
 function renderCards(items) {
@@ -67,22 +68,23 @@ function renderCards(items) {
         return;
     }
 
-    videoGrid.innerHTML = items.map((item) => {
+    magazineGrid.innerHTML = items.map((item) => {
         const title = escapeHtml(item.title || "无标题");
-        const uploader = escapeHtml(item.uploader || "未知频道");
-        const duration = escapeHtml(item.duration || "未知");
+        const creator = escapeHtml(item.creator || "未知");
+        const date = escapeHtml(formatDate(item.date));
         const thumb = escapeHtml(item.thumbnail || "");
         const link = escapeHtml(item.webpage_url || "#");
-        const videoId = escapeHtml(item.id || "");
+        const magazineId = escapeHtml(item.id || "");
+        const subject = escapeHtml((item.subject || "").slice(0, 80));
         return `
-            <article class="video-card">
-                <img class="video-thumb" src="${thumb}" alt="${title}" loading="lazy">
-                <div class="video-content">
-                    <h3 class="video-title">${title}</h3>
-                    <p class="video-meta">${uploader} · 时长 ${duration}</p>
-                    <div class="video-actions">
-                        <button class="play-btn" data-id="${videoId}" type="button">站内播放</button>
-                        <a class="jump-link" href="${link}" target="_blank" rel="noopener noreferrer">原站链接</a>
+            <article class="magazine-card">
+                <img class="magazine-cover" src="${thumb}" alt="${title}" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22260%22%3E%3Crect fill=%22%23333%22 width=%22200%22 height=%22260%22/%3E%3Ctext fill=%22%23999%22 x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22%3E暂无封面%3C/text%3E%3C/svg%3E'">
+                <div class="magazine-content">
+                    <h3 class="magazine-title">${title}</h3>
+                    <p class="magazine-meta">${creator} · ${date}</p>
+                    ${subject ? `<p class="magazine-subject">${subject}</p>` : ""}
+                    <div class="magazine-actions">
+                        <a class="view-btn" href="${link}" target="_blank" rel="noopener noreferrer">在线阅读</a>
                     </div>
                 </div>
             </article>
@@ -113,32 +115,6 @@ async function fetchSearch(query) {
     }
 }
 
-async function playVideo(videoId) {
-    if (!videoId) return;
-    hideError();
-    setLoading(true);
-    try {
-        const infoResp = await fetch(buildApiUrl(`/api/video/${encodeURIComponent(videoId)}`));
-        if (!infoResp.ok) {
-            throw new Error(`HTTP ${infoResp.status}`);
-        }
-        const info = await infoResp.json();
-        const streamUrl = buildApiUrl(`/api/stream/${encodeURIComponent(videoId)}?format_id=${encodeURIComponent(info.default_format_id || "")}`);
-        videoPlayer.src = streamUrl;
-        videoPlayer.load();
-        playerTitle.textContent = info.title || "播放器";
-        playerMeta.textContent = `${info.uploader || "未知频道"} · 时长 ${info.duration || "未知"}`;
-        playerPanel.classList.remove("hidden");
-        videoPlayer.scrollIntoView({ behavior: "smooth", block: "center" });
-        statusText.textContent = `正在播放：${info.title || videoId}`;
-    } catch (err) {
-        console.error(err);
-        showError(`播放失败：${err.message || "未知错误"}`);
-    } finally {
-        setLoading(false);
-    }
-}
-
 searchForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const query = searchInput.value.trim();
@@ -155,27 +131,10 @@ quickButtons.forEach((button) => {
     });
 });
 
-videoGrid.addEventListener("click", async (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
-    if (target.classList.contains("play-btn")) {
-        const videoId = target.dataset.id;
-        await playVideo(videoId);
-    }
-});
-
-closePlayerBtn.addEventListener("click", () => {
-    videoPlayer.pause();
-    videoPlayer.removeAttribute("src");
-    videoPlayer.load();
-    playerPanel.classList.add("hidden");
-    playerMeta.textContent = "";
-});
-
 const runningOnGithubPages = window.location.hostname.endsWith("github.io");
 if (runningOnGithubPages && !apiBase) {
     statusText.textContent = "当前是 GitHub Pages 静态站，请先配置后端 API。";
-    showError("请在网址后追加 ?api=https://你的后端域名 ，例如：.../youtube/?api=https://your-backend.example.com");
+    showError("请在网址后追加 ?api=https://你的后端域名 ，例如：.../?api=https://your-backend.example.com");
 } else {
-    fetchSearch("热门音乐");
+    fetchSearch("Life Magazine");
 }
