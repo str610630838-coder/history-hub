@@ -1,19 +1,17 @@
-# YouTube 镜像站（FastAPI）
+# 历史文献馆（History Hub）
 
-这是一个可直接部署的 YouTube 镜像站示例：
+从 Project Gutenberg（古腾堡计划）搜索与展示历史书籍资料，探索免 PDF 的纯净公版宝库。
 
-- 前端：搜索页 + 播放器页（同域调用）
-- 后端：FastAPI + `yt-dlp`，提供搜索、详情、视频流代理
-- 目标：客户端只访问你自己的域名，不直接请求 YouTube 页面
-
-> 说明：本项目仅用于学习与技术演示，请遵守当地法律法规、平台服务条款与版权要求。
+- 前端：搜索页 + 卡片列表（同域调用）
+- 后端：FastAPI + Gutendex API，提供搜索与详情查询
+- 数据来源：Project Gutenberg 公版书籍
 
 ## 功能
 
-- 关键词搜索视频（`/api/search`）
-- 读取视频详情与可播放格式（`/api/video/{id}`）
-- 服务端代理视频流（`/api/stream/{id}`，支持 Range）
-- 简洁的中文前端界面（搜索、卡片列表、站内播放）
+- 关键词搜索书籍文献（`/api/search`）
+- 获取单本文献详情（`/api/magazine/{id}`）
+- 快捷搜索按钮（Magazine / History / Science）
+- 简洁的中文前端界面（搜索、卡片列表、在线阅读跳转）
 
 ## 项目结构
 
@@ -23,7 +21,8 @@
 ├── requirements.txt
 ├── index.html        # 前端页面
 ├── script.js         # 前端逻辑
-└── styles.css        # 前端样式
+├── styles.css        # 前端样式
+└── Dockerfile        # 容器化部署
 ```
 
 ## 本地运行
@@ -49,34 +48,12 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 ## API 简要
 
 - `GET /api/health` 健康检查
-- `GET /api/search?q=关键词&limit=18`
-- `GET /api/video/{video_id}`
-- `GET /api/stream/{video_id}?format_id=18`
-
-## 部署建议
-
-推荐部署到支持 Python 长连接流式响应的平台（如云服务器 / 容器平台）：
-
-- 使用 Nginx/Caddy 做反向代理
-- 打开 HTTPS（必须）
-- 为 `/api/stream/*` 设置更高超时时间
-- 视并发配置带宽与缓存策略
-
-## GitHub Pages 说明（已修复）
-
-本仓库已包含 `.github/workflows/deploy-pages.yml`，推送后会自动发布静态前端到 Pages。
-
-- 项目页地址通常为：`https://<username>.github.io/<repo>/`
-- 本项目中即：`https://str610630838-coder.github.io/youtube/`
-
-注意：GitHub Pages 只能托管静态文件，不能运行 FastAPI 后端。  
-因此在 Pages 上访问时，需要指定后端地址：
-
-`https://str610630838-coder.github.io/youtube/?api=https://你的后端域名`
+- `GET /api/search?q=关键词&limit=18` 搜索文献
+- `GET /api/magazine/{id}` 获取单本文献详情
 
 ## 一键容器启动（可选）
 
 ```bash
-docker build -t youtube-mirror .
-docker run -p 8000:8000 youtube-mirror
+docker build -t history-hub .
+docker run -p 8000:8000 history-hub
 ```
