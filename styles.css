@@ -488,13 +488,25 @@ body {
 
 /* ══════════════ 全屏阅读器 ══════════════ */
 
-.reader-view {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
+/* <dialog> 置于 top-layer，无需手动管理 z-index */
+dialog.reader-dialog {
+  border: none;
+  padding: 0;
+  margin: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: 100vw;
+  max-height: 100dvh;
   background: #0b0d12;
+}
+
+dialog.reader-dialog[open] {
   display: flex;
   flex-direction: column;
+}
+
+dialog.reader-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.85);
 }
 
 .reader-header {

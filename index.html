@@ -65,8 +65,8 @@
     数据来源于 Project Gutenberg，采用原生 HTML/EPUB 网页渲染，完全拒绝 PDF，尽享流畅阅读体验。
   </footer>
 
-  <!-- 全屏阅读器 -->
-  <div id="readerModal" class="reader-view hidden">
+  <!-- 全屏阅读器（使用原生 <dialog> 置于 top-layer，确保沉浸式翻译扩展可正常识别内容） -->
+  <dialog id="readerModal" class="reader-dialog">
     <div class="reader-header">
       <button id="closeReader" class="reader-icon-btn">✕ 关闭</button>
       <div class="reader-title-area">
@@ -103,7 +103,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <script src="script.js"></script>
 </body>

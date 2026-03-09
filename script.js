@@ -419,6 +419,17 @@ function switchTab(tabName) {
  * 按双换行切分段落；单行换行保留在 <p> 内（white-space:pre-wrap）。
  */
 function _renderParagraphs(text) {
+  // 清除上一章残留的"已处理"标记，让扩展对新内容重新扫描
+  const WALKED_ATTRS = [
+    "data-immersive-translate-walked",
+    "data-immersive-translate-effect",
+    "data-immersive-translate-block-id",
+  ];
+  WALKED_ATTRS.forEach(a => chapterText.removeAttribute(a));
+  chapterText
+    .querySelectorAll(WALKED_ATTRS.map(a => `[${a}]`).join(","))
+    .forEach(el => WALKED_ATTRS.forEach(a => el.removeAttribute(a)));
+
   chapterText.innerHTML = "";
   const paragraphs = text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
   const fragment = document.createDocumentFragment();
@@ -435,77 +446,8 @@ function _renderParagraphs(text) {
     fragment.appendChild(p);
   }
   chapterText.appendChild(fragment);
-  _notifyTranslationPlugins();
 }
 
-/**
- * 通知翻译插件（沉浸式翻译等）本区域有新内容需要处理。
- * 插件首次扫描时会沿 DOM 树向上标记祖先节点为"已处理"；
- * 章节动态注入后，必须清除从 <body> 到 #chapterText 整条路径上
- * 所有元素的 walked/effect 标记，插件才会重新向下扫描。
- */
-function _notifyTranslationPlugins() {
-  // 清除 #chapterText 到 <body> 整条祖先链上的"已处理"标记
-  let node = chapterText;
-  while (node && node !== document.documentElement) {
-    node.removeAttribute("data-immersive-translate-walked");
-    node.removeAttribute("data-immersive-translate-effect");
-    node.removeAttribute("data-immersive-translate-block-id");
-    node = node.parentElement;
-  }
-
-  // 同时清除 #chapterText 内所有子元素的标记（切换章节时残留）
-  chapterText
-    .querySelectorAll(
-      "[data-immersive-translate-walked],[data-immersive-translate-effect],[data-immersive-translate-block-id]"
-    )
-    .forEach(el => {
-      el.removeAttribute("data-immersive-translate-walked");
-      el.removeAttribute("data-immersive-translate-effect");
-      el.removeAttribute("data-immersive-translate-block-id");
-    });
-
-  // 等渲染完成后调用插件 API
-  requestAnimationFrame(() => {
-    setTimeout(() => {
-      // 再次清除标记（防止扩展的 MutationObserver 在 200ms 内重新打上标记）
-      let n = chapterText;
-      while (n && n !== document.documentElement) {
-        n.removeAttribute("data-immersive-translate-walked");
-        n.removeAttribute("data-immersive-translate-effect");
-        n.removeAttribute("data-immersive-translate-block-id");
-        n = n.parentElement;
-      }
-      chapterText
-        .querySelectorAll(
-          "[data-immersive-translate-walked],[data-immersive-translate-effect],[data-immersive-translate-block-id]"
-        )
-        .forEach(el => {
-          el.removeAttribute("data-immersive-translate-walked");
-          el.removeAttribute("data-immersive-translate-effect");
-          el.removeAttribute("data-immersive-translate-block-id");
-        });
-
-      // 依次尝试所有可用 API，不提前 return，确保多重触发
-      try {
-        // 内部全页 API（最完整，含等待机制）
-        if (window.__immersiveTranslate?.translatePageAndWait) {
-          window.__immersiveTranslate.translatePageAndWait();
-        }
-        // 公开 API：优先针对具体元素，精准触发正文区域翻译；否则回退到整页翻译
-        if (window.immersiveTranslate?.translateElement) {
-          window.immersiveTranslate.translateElement(chapterText);
-        } else if (window.immersiveTranslate?.translatePage) {
-          window.immersiveTranslate.translatePage();
-        }
-      } catch (_) {}
-      try {
-        document.dispatchEvent(new CustomEvent("immersive-translate:page-loaded"));
-        chapterText.dispatchEvent(new CustomEvent("translate:new-content", { bubbles: true }));
-      } catch (_) {}
-    }, 200);
-  });
-}
 
 async function openReader(bookId, bookTitle, webpageUrl) {
   readerTitle.textContent    = bookTitle;
@@ -524,7 +466,7 @@ async function openReader(bookId, bookTitle, webpageUrl) {
   readerState.webpageUrl  = webpageUrl;
   readerState.chapters    = [];
 
-  readerModal.classList.remove("hidden");
+  readerModal.showModal();
   document.body.style.overflow = "hidden";
 
   // 恢复书架中保存的进度
@@ -614,12 +556,7 @@ async function loadChapter(bookId, chapterNum) {
 }
 
 function closeReader() {
-  readerModal.classList.add("hidden");
-  document.body.style.overflow = "";
-  // 刷新卡片进度显示
-  renderCards(Object.values(currentItems));
-  if (!document.getElementById("tab-bookshelf").classList.contains("active")) return;
-  renderShelf();
+  readerModal.close();
 }
 
 // ─── 事件委托（统一处理卡片内按钮） ────────────────────────────────────────
@@ -673,6 +610,15 @@ tabBtns.forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset
 // 阅读器控制
 closeReaderBtn.addEventListener("click", closeReader);
 
+// dialog 关闭时（关闭按钮或 Esc 键）统一清理
+readerModal.addEventListener("close", () => {
+  document.body.style.overflow = "";
+  renderCards(Object.values(currentItems));
+  if (document.getElementById("tab-bookshelf").classList.contains("active")) {
+    renderShelf();
+  }
+});
+
 toggleSidebarBtn.addEventListener("click", () => {
   chapterSidebar.classList.toggle("open");
 });
@@ -689,12 +635,11 @@ nextChapterBtn.addEventListener("click", () => {
   }
 });
 
-// 键盘快捷键
+// 键盘快捷键（Esc 由 <dialog> 原生处理，此处仅补充左右翻章）
 document.addEventListener("keydown", e => {
-  if (readerModal.classList.contains("hidden")) return;
-  if (e.key === "Escape")      closeReader();
-  if (e.key === "ArrowLeft")   prevChapterBtn.click();
-  if (e.key === "ArrowRight")  nextChapterBtn.click();
+  if (!readerModal.open) return;
+  if (e.key === "ArrowLeft")  prevChapterBtn.click();
+  if (e.key === "ArrowRight") nextChapterBtn.click();
 });
 
 // ─── 搜索 ──────────────────────────────────────────────────────────────────
