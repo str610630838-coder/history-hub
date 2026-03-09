@@ -5,6 +5,7 @@
 
 // ─── 常量 ──────────────────────────────────────────────────────────────────
 const GUTENDEX_BASE      = "https://gutendex.com/books";
+const API_BASE           = "/api";
 const SHELF_KEY          = "history-hub-bookshelf";
 const READER_STATE_KEY   = "history-hub-reader-state";
 const READER_FONT_KEY    = "history-hub-reader-font-size";
@@ -508,13 +509,12 @@ async function fetchSearch(query) {
   hideError();
   statusText.textContent = `正在搜索：${query}`;
   try {
-    const url  = `${GUTENDEX_BASE}/?search=${encodeURIComponent(query)}`;
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data    = await parseJsonFromResponse(resp, "搜索接口");
-    const results = Array.isArray(data.results) ? data.results : [];
-    const items   = results.slice(0, 18).filter(d => d.id).map(normalizeMagazineEntry);
+    // 优先走后端代理，避免浏览器对第三方站点的 CORS/反爬限制
+    const resp = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}&limit=18`);
+    const data = await parseJsonFromResponse(resp, "搜索接口");
+    if (!resp.ok) throw new Error(data?.detail || `HTTP ${resp.status}`);
 
+    const items = Array.isArray(data.items) ? data.items : [];
     items.forEach(item => { currentItems[item.id] = item; });
     renderCards(items);
     statusText.textContent = `搜索完成：${query}（共 ${items.length} 条）`;
