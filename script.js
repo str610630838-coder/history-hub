@@ -1,9 +1,9 @@
 /**
  * 历史杂志馆 - 前端脚本
- * 新架构：纯后端模式
+ * 纯前端模式：直接调用 Gutendex 公开 API（支持 CORS）
  * 数据源：Project Gutenberg (Gutendex)
  */
-const apiBase = "";
+const GUTENDEX_BASE = "https://gutendex.com/books";
 
 const searchForm = document.getElementById("searchForm");
 const searchInput = document.getElementById("searchInput");
@@ -15,8 +15,26 @@ const magazineGrid = document.getElementById("magazineGrid");
 const loading = document.getElementById("loading");
 const errorBox = document.getElementById("errorBox");
 
-function buildApiUrl(path) {
-  return `${apiBase}${path}`;
+function normalizeMagazineEntry(doc) {
+  const identifier = String(doc.id || "");
+  const authors = doc.authors || [];
+  const creator = authors.length ? authors[0].name || "未知" : "未知";
+  const subjects = doc.subjects || [];
+  const subject = subjects.slice(0, 3).map(s => s.split("--").pop().trim()).join(", ");
+  const description = `下载量: ${doc.download_count || 0} | 语言: ${(doc.languages || []).join(", ")}`;
+  const formats = doc.formats || {};
+  const cover = formats["image/jpeg"] || "";
+  const webpage_url = formats["text/html"] || formats["text/plain; charset=utf-8"] ||
+    `https://www.gutenberg.org/ebooks/${identifier}`;
+  return {
+    id: identifier,
+    title: doc.title || "无标题",
+    creator,
+    description,
+    subject,
+    thumbnail: cover,
+    webpage_url,
+  };
 }
 
 function escapeHtml(text) {
@@ -43,17 +61,6 @@ function hideError() {
 function renderEmpty() {
   magazineGrid.innerHTML = '<p class="magazine-empty">没有搜索到杂志，请换个关键词试试。</p>';
   resultCount.textContent = "0";
-}
-
-function formatDate(dateStr) {
-  if (!dateStr || typeof dateStr !== "string") return "日期未知";
-  const parts = String(dateStr).split("-")[0].split(" ");
-  return parts[0] || dateStr;
-}
-
-/** 后端已经统一了格式，前端只需原样透传 */
-function normalizeMagazineEntry(doc) {
-  return doc;
 }
 
 const PLACEHOLDER_SVG =
@@ -97,12 +104,14 @@ async function fetchSearch(query) {
   hideError();
   statusText.textContent = `正在搜索：${query}`;
   try {
-    const resp = await fetch(
-      buildApiUrl(`/api/search?q=${encodeURIComponent(query)}&limit=18`)
-    );
+    const url = `${GUTENDEX_BASE}/?search=${encodeURIComponent(query)}`;
+    const resp = await fetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
-    const items = Array.isArray(data.items) ? data.items : [];
+    const results = Array.isArray(data.results) ? data.results : [];
+    const items = results.slice(0, 18)
+      .filter(d => d.id)
+      .map(normalizeMagazineEntry);
 
     renderCards(items);
     statusText.textContent = `搜索完成：${query}（共 ${items.length} 条）`;
