@@ -425,11 +425,13 @@ function _renderParagraphs(text) {
   for (const para of paragraphs) {
     const p = document.createElement("p");
     p.textContent = para;
+    p.setAttribute("lang", "en");
     fragment.appendChild(p);
   }
   if (!fragment.childNodes.length) {
     const p = document.createElement("p");
     p.textContent = text;
+    p.setAttribute("lang", "en");
     fragment.appendChild(p);
   }
   chapterText.appendChild(fragment);
@@ -466,20 +468,35 @@ function _notifyTranslationPlugins() {
   // 等渲染完成后调用插件 API
   requestAnimationFrame(() => {
     setTimeout(() => {
+      // 再次清除标记（防止扩展的 MutationObserver 在 200ms 内重新打上标记）
+      let n = chapterText;
+      while (n && n !== document.documentElement) {
+        n.removeAttribute("data-immersive-translate-walked");
+        n.removeAttribute("data-immersive-translate-effect");
+        n.removeAttribute("data-immersive-translate-block-id");
+        n = n.parentElement;
+      }
+      chapterText
+        .querySelectorAll(
+          "[data-immersive-translate-walked],[data-immersive-translate-effect],[data-immersive-translate-block-id]"
+        )
+        .forEach(el => {
+          el.removeAttribute("data-immersive-translate-walked");
+          el.removeAttribute("data-immersive-translate-effect");
+          el.removeAttribute("data-immersive-translate-block-id");
+        });
+
+      // 依次尝试所有可用 API，不提前 return，确保多重触发
       try {
         // 内部全页 API（最完整，含等待机制）
         if (window.__immersiveTranslate?.translatePageAndWait) {
           window.__immersiveTranslate.translatePageAndWait();
-          return;
         }
         // 公开 API：优先针对具体元素，精准触发正文区域翻译；否则回退到整页翻译
         if (window.immersiveTranslate?.translateElement) {
           window.immersiveTranslate.translateElement(chapterText);
-          return;
-        }
-        if (window.immersiveTranslate?.translatePage) {
+        } else if (window.immersiveTranslate?.translatePage) {
           window.immersiveTranslate.translatePage();
-          return;
         }
       } catch (_) {}
       try {
