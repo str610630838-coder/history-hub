@@ -99,7 +99,7 @@ function normalizeMagazineEntry(doc) {
     description,
     subject,
     thumbnail: identifier ? `${IA_IMG_BASE}${identifier}` : "",
-    webpage_url: identifier ? `${IA_DETAILS_BASE}${identifier}` : "",
+    webpage_url: identifier ? `${IA_DETAILS_BASE}${identifier}/mode/2up` : "",
   };
 }
 
@@ -108,8 +108,8 @@ function normalizeMagazineEntry(doc) {
  * archive.org/advancedsearch.php 原生支持 CORS，无需代理
  */
 async function searchViaArchiveDirect(query, limit = 18) {
-  // 主搜索：periodicals 集合
-  const searchQuery = `collection:(periodicals OR magazine_rack) ${query}`;
+  // 主搜索：periodicals 集合，加入过滤条件确保有翻页阅读器格式（排除纯PDF文件）
+  const searchQuery = `collection:(periodicals OR magazine_rack) ${query} AND (format:Scandata OR format:"Single Page Processed JP2 ZIP")`;
   const params = new URLSearchParams({
     q: searchQuery,
     output: "json",
@@ -126,8 +126,8 @@ async function searchViaArchiveDirect(query, limit = 18) {
     return docs.filter((d) => d.identifier).map(normalizeMagazineEntry);
   }
 
-  // 备用：broad texts 搜索
-  const fallbackQuery = `mediatype:texts ${query}`;
+  // 备用：broad texts 搜索，同样过滤以确保有翻页阅读器
+  const fallbackQuery = `mediatype:texts ${query} AND (format:Scandata OR format:"Single Page Processed JP2 ZIP")`;
   const fallbackParams = new URLSearchParams({
     q: fallbackQuery,
     output: "json",
