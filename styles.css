@@ -1,207 +1,213 @@
 :root {
-    --bg: #0f1115;
-    --panel: #1a1d24;
-    --panel-hover: #222734;
-    --border: #2e3445;
-    --text-main: #f0f3fa;
-    --text-sub: #9aa3b8;
-    --brand: #b8860b;
-    --brand-hover: #daa520;
+  --bg: #0f1115;
+  --panel: #1a1d24;
+  --panel-hover: #222734;
+  --border: #2e3445;
+  --text-main: #f0f3fa;
+  --text-sub: #9aa3b8;
+  --brand: #b8860b;
+  --brand-hover: #daa520;
 }
 
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
-    font-family: "Noto Sans SC", "Noto Serif SC", -apple-system, BlinkMacSystemFont, "Segoe UI", serif;
-    background: var(--bg);
-    color: var(--text-main);
-    min-height: 100vh;
+  font-family: "Noto Sans SC", "Noto Serif SC", -apple-system, BlinkMacSystemFont, "Segoe UI", serif;
+  background: var(--bg);
+  color: var(--text-main);
+  min-height: 100vh;
 }
 
 .header {
-    padding: 1.5rem 1rem;
-    border-bottom: 1px solid var(--border);
-    text-align: center;
+  padding: 1.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
 }
 
 .header h1 {
-    font-size: 2rem;
-    font-family: "Noto Serif SC", serif;
+  font-size: 2rem;
+  font-family: "Noto Serif SC", serif;
 }
 
 .header p {
-    margin-top: 0.45rem;
-    color: var(--text-sub);
+  margin-top: 0.45rem;
+  color: var(--text-sub);
 }
 
 .container {
-    max-width: 1180px;
-    margin: 0 auto;
-    padding: 1rem;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1rem;
 }
 
 .search-panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
 }
 
 #searchForm {
-    display: flex;
-    gap: 0.6rem;
+  display: flex;
+  gap: 0.6rem;
 }
 
 #searchInput {
-    flex: 1;
-    border: 1px solid var(--border);
-    background: #0f131c;
-    color: var(--text-main);
-    border-radius: 8px;
-    padding: 0.75rem 0.85rem;
-    font-size: 0.95rem;
+  flex: 1;
+  border: 1px solid var(--border);
+  background: #0f131c;
+  color: var(--text-main);
+  border-radius: 8px;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.95rem;
 }
 
 #searchBtn,
 .quick-btn,
 .view-btn {
-    border: none;
-    border-radius: 8px;
-    background: var(--brand);
-    color: #fff;
-    padding: 0.7rem 0.95rem;
-    cursor: pointer;
-    font-size: 0.9rem;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: var(--brand);
+  color: #fff;
+  padding: 0.7rem 0.95rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #searchBtn:hover,
 .quick-btn:hover,
 .view-btn:hover {
-    background: var(--brand-hover);
+  background: var(--brand-hover);
 }
 
 .quick-actions {
-    margin-top: 0.75rem;
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .status-row {
-    margin: 0.9rem 0 1rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: var(--text-sub);
+  margin: 0.9rem 0 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--text-sub);
 }
 
 .loading,
 .error {
-    margin-bottom: 1rem;
-    border-radius: 10px;
-    padding: 0.8rem 0.95rem;
+  margin-bottom: 1rem;
+  border-radius: 10px;
+  padding: 0.8rem 0.95rem;
 }
 
 .loading {
-    background: #18283e;
-    border: 1px solid #274b72;
+  background: #18283e;
+  border: 1px solid #274b72;
 }
 
 .error {
-    background: #3a1a22;
-    border: 1px solid #723040;
-    color: #ffb0bf;
+  background: #3a1a22;
+  border: 1px solid #723040;
+  color: #ffb0bf;
+}
+
+.magazine-empty {
+  padding: 1.5rem;
+  color: var(--text-sub);
+  text-align: center;
 }
 
 .magazine-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.25rem;
 }
 
 .magazine-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
-    transition: 0.2s ease;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: 0.2s ease;
 }
 
 .magazine-card:hover {
-    transform: translateY(-2px);
-    background: var(--panel-hover);
+  transform: translateY(-2px);
+  background: var(--panel-hover);
 }
 
 .magazine-cover {
-    width: 100%;
-    aspect-ratio: 3 / 4;
-    object-fit: cover;
-    background: #1a1d24;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  background: #1a1d24;
 }
 
 .magazine-content {
-    padding: 0.8rem;
+  padding: 0.8rem;
 }
 
 .magazine-title {
-    font-size: 0.95rem;
-    line-height: 1.4;
-    min-height: 2.5rem;
-    font-family: "Noto Serif SC", serif;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  min-height: 2.5rem;
+  font-family: "Noto Serif SC", serif;
 }
 
 .magazine-meta {
-    margin-top: 0.45rem;
-    color: var(--text-sub);
-    font-size: 0.85rem;
+  margin-top: 0.45rem;
+  color: var(--text-sub);
+  font-size: 0.85rem;
 }
 
 .magazine-subject {
-    margin-top: 0.35rem;
-    color: var(--text-sub);
-    font-size: 0.8rem;
-    line-height: 1.3;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+  margin-top: 0.35rem;
+  color: var(--text-sub);
+  font-size: 0.8rem;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .magazine-actions {
-    margin-top: 0.75rem;
+  margin-top: 0.75rem;
 }
 
 .footer {
-    text-align: center;
-    color: var(--text-sub);
-    border-top: 1px solid var(--border);
-    margin-top: 1.5rem;
-    padding: 1.2rem 1rem 1.8rem;
-    font-size: 0.85rem;
+  text-align: center;
+  color: var(--text-sub);
+  border-top: 1px solid var(--border);
+  margin-top: 1.5rem;
+  padding: 1.2rem 1rem 1.8rem;
+  font-size: 0.85rem;
 }
 
 .hidden {
-    display: none;
+  display: none;
 }
 
 @media (max-width: 760px) {
-    #searchForm {
-        flex-direction: column;
-    }
+  #searchForm {
+    flex-direction: column;
+  }
 
-    #searchBtn {
-        width: 100%;
-    }
+  #searchBtn {
+    width: 100%;
+  }
 
-    .magazine-grid {
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    }
+  .magazine-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
 }
