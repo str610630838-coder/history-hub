@@ -108,8 +108,8 @@ function normalizeMagazineEntry(doc) {
  * archive.org/advancedsearch.php 原生支持 CORS，无需代理
  */
 async function searchViaArchiveDirect(query, limit = 18) {
-  // 主搜索：periodicals 集合，加入过滤条件确保有翻页阅读器格式（排除纯PDF文件）
-  const searchQuery = `collection:(periodicals OR magazine_rack) ${query} AND (format:Scandata OR format:"Single Page Processed JP2 ZIP")`;
+  // 主搜索：periodicals 集合，加入过滤条件确保有真实的按页扫描数据（排除纯PDF文件和原生数字PDF上传）
+  const searchQuery = `collection:(periodicals OR magazine_rack) ${query} AND (format:Scandata OR format:"Single Page Processed JP2 ZIP") AND imagecount:[1 TO *]`;
   const params = new URLSearchParams({
     q: searchQuery,
     output: "json",
@@ -126,8 +126,8 @@ async function searchViaArchiveDirect(query, limit = 18) {
     return docs.filter((d) => d.identifier).map(normalizeMagazineEntry);
   }
 
-  // 备用：broad texts 搜索，同样过滤以确保有翻页阅读器
-  const fallbackQuery = `mediatype:texts ${query} AND (format:Scandata OR format:"Single Page Processed JP2 ZIP")`;
+  // 备用：broad texts 搜索，同样严格过滤以排除纯PDF
+  const fallbackQuery = `mediatype:texts ${query} AND (format:Scandata OR format:"Single Page Processed JP2 ZIP") AND imagecount:[1 TO *]`;
   const fallbackParams = new URLSearchParams({
     q: fallbackQuery,
     output: "json",
