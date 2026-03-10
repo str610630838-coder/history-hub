@@ -3,6 +3,10 @@
     {
       "source": "/gutenberg/:match*",
       "destination": "https://www.gutenberg.org/:match*"
+    },
+    {
+      "source": "/cache/:match*",
+      "destination": "https://www.gutenberg.org/cache/:match*"
     }
   ]
 }
