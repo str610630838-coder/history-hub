@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/gutenberg/:match*",
+      "destination": "https://www.gutenberg.org/:match*"
+    }
+  ]
+}

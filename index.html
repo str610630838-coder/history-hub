@@ -3,25 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>History Hub · 历史杂志档案</title>
+  <title>History Hub · 动态历史档案</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="container hero">
     <h1>History Hub</h1>
-    <p>历史杂志抓取与静态展示站</p>
+    <p>全网历史巨著动态搜索引擎与流媒体阅读站</p>
   </header>
 
   <main class="container">
     <section class="toolbar">
-      <input id="q" type="search" placeholder="搜索标题、主题、年份（例如：china / 1912）" />
+      <input id="q" type="search" placeholder="输入你想找的任何英文书籍（如 china, napoleon, art）" />
+      <button id="searchBtn">云端搜索</button>
       <button id="bookshelfBtn">我的书架</button>
-      <button id="reloadBtn">刷新数据说明</button>
     </section>
 
     <p class="hint">
-      数据来源：Project Gutenberg (全英文历史著作，无文言文)。<br />
-      首次部署后，请运行 <code>python scripts/fetch_magazines.py</code> 生成/更新 <code>data/magazines.json</code>。
+      架构已升级为 <b>Vercel Serverless 全栈模式</b>。<br/>
+      后端实时调用 API 检索全网数据，利用边缘节点(Edge Proxy)突破古登堡防盗链，实现秒开阅读！
     </p>
 
     <section id="stats" class="stats"></section>
@@ -38,7 +38,7 @@
       <div class="modal-body">
         <div id="readerLoader" class="reader-loader">
           <div class="spinner"></div>
-          <p>努力加载中，请稍候...</p>
+          <p>从边缘节点极速加载中，请稍候...</p>
         </div>
         <div id="epubViewer" style="display:none; width: 100%; height: 100%; position: relative;">
           <div id="epubArea" style="width: 100%; height: 100%;"></div>
@@ -59,7 +59,7 @@
       <div class="actions">
         <button class="bookmark-btn">加入书架</button>
         <button class="read-btn">站内阅读</button>
-        <a class="link" target="_blank" rel="noopener noreferrer">外部打开</a>
+        <a class="link" target="_blank" rel="noopener noreferrer">源站</a>
       </div>
     </article>
   </template>
@@ -67,7 +67,6 @@
   <!-- 引入 ePub.js 和 JSZip 依赖 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
-
   <script src="script.js"></script>
 </body>
 </html>

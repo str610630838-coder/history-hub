@@ -1,8 +1,8 @@
 const grid = document.getElementById('grid');
 const q = document.getElementById('q');
+const searchBtn = document.getElementById('searchBtn');
 const stats = document.getElementById('stats');
 const tpl = document.getElementById('cardTpl');
-const reloadBtn = document.getElementById('reloadBtn');
 const bookshelfBtn = document.getElementById('bookshelfBtn');
 
 const readerModal = document.getElementById('readerModal');
@@ -15,117 +15,104 @@ const epubArea = document.getElementById('epubArea');
 const prevBtn = document.getElementById('prevBtn');
 const nextBtn = document.getElementById('nextBtn');
 
-let currentBook = null;
-let currentRendition = null;
-
 let allItems = [];
 let showOnlyBookshelf = false;
 
-// 书架使用 localStorage 存储 identifier
+// 动态后端版本：书架现在存入完整的书籍对象，而不仅是 identifier
 function getBookshelf() {
   try {
-    return JSON.parse(localStorage.getItem('history-bookshelf') || '[]');
+    return JSON.parse(localStorage.getItem('history-bookshelf-full') || '[]');
   } catch (e) {
     return [];
   }
 }
 
 function saveBookshelf(books) {
-  localStorage.setItem('history-bookshelf', JSON.stringify(books));
+  localStorage.setItem('history-bookshelf-full', JSON.stringify(books));
 }
 
-function toggleBookmark(identifier) {
+function toggleBookmark(itemStr) {
+  const item = JSON.parse(itemStr);
   let books = getBookshelf();
-  if (books.includes(identifier)) {
-    books = books.filter(id => id !== identifier);
+  const existingIndex = books.findIndex(b => b.identifier === item.identifier);
+  
+  if (existingIndex > -1) {
+    books.splice(existingIndex, 1);
   } else {
-    books.push(identifier);
+    books.push(item);
   }
   saveBookshelf(books);
   render();
 }
 
-async function loadData() {
+async function searchData() {
+  const keyword = q.value.trim() || 'history';
+  stats.textContent = `⚡ 正在动态解析 "${keyword}" 的资源并提取直链，请稍候...`;
+  grid.innerHTML = '';
+  
   try {
-    const res = await fetch('./data/magazines.json', { cache: 'no-store' });
+    // 请求 Vercel Serverless 后端 API
+    const res = await fetch(`/api/search?q=${encodeURIComponent(keyword)}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     allItems = data.items || [];
+    showOnlyBookshelf = false;
+    bookshelfBtn.classList.remove('active');
     render();
   } catch (err) {
-    stats.textContent = `加载失败：${err.message}。请先运行抓取脚本生成 data/magazines.json`;
+    stats.textContent = `获取失败：${err.message}`;
   }
 }
 
-function normalize(v) {
-  return String(v ?? '').toLowerCase();
-}
-
 function render() {
-  const keyword = normalize(q.value).trim();
-  const books = getBookshelf();
-
-  const filtered = allItems.filter((item) => {
-    if (showOnlyBookshelf && !books.includes(item.identifier)) {
-      return false;
-    }
-    if (!keyword) return true;
-    const joined = [
-      item.title,
-      item.year,
-      item.identifier,
-      ...(item.subject || [])
-    ].map(normalize).join(' ');
-    return joined.includes(keyword);
-  });
-
+  let displayItems = showOnlyBookshelf ? getBookshelf() : allItems;
   stats.textContent = showOnlyBookshelf 
-    ? `书架共 ${filtered.length} 条`
-    : `共 ${allItems.length} 条，当前显示 ${filtered.length} 条`;
+    ? `书架共存有 ${displayItems.length} 本书籍`
+    : `为您搜索到 ${displayItems.length} 本原版电子书 (基于 Vercel 动态接口)`;
   
   grid.innerHTML = '';
 
-  filtered.forEach((item) => {
+  displayItems.forEach((item) => {
     const node = tpl.content.firstElementChild.cloneNode(true);
     node.querySelector('.title').textContent = item.title || 'Untitled';
-    node.querySelector('.meta').textContent = `年份：${item.year || '未知'} · ID：${item.identifier}`;
+    node.querySelector('.meta').textContent = `ID：${item.identifier} ${item.isEpub ? '· 支持EPUB精排' : '· HTML流'}`;
     node.querySelector('.desc').textContent = item.description || '暂无简介';
     
     const tags = node.querySelector('.tags');
-    (item.subject || []).slice(0, 5).forEach((tag) => {
+    (item.subject || []).slice(0, 3).forEach((tag) => {
       const el = document.createElement('span');
       el.className = 'tag';
-      el.textContent = tag;
+      el.textContent = tag.split('--')[0].trim();
       tags.appendChild(el);
     });
 
-    // 书架按钮
+    const books = getBookshelf();
     const bookmarkBtn = node.querySelector('.bookmark-btn');
-    const isSaved = books.includes(item.identifier);
+    const isSaved = books.some(b => b.identifier === item.identifier);
     if (isSaved) {
       bookmarkBtn.classList.add('saved');
       bookmarkBtn.textContent = '移出书架';
     }
-    bookmarkBtn.addEventListener('click', () => toggleBookmark(item.identifier));
+    bookmarkBtn.addEventListener('click', () => toggleBookmark(JSON.stringify(item)));
 
-    // 站内阅读按钮
     const readBtn = node.querySelector('.read-btn');
     readBtn.addEventListener('click', () => openReader(item.title, item.url, item.isEpub));
 
-    // 外部链接
     const link = node.querySelector('.link');
-    link.href = item.url;
+    link.href = item.url.replace('/gutenberg', 'https://www.gutenberg.org');
     
     grid.appendChild(node);
   });
 }
 
+let currentBook = null;
+let currentRendition = null;
+
 function openReader(title, url, isEpub) {
   readerTitle.textContent = title;
-  readerLoader.style.display = 'flex'; // 显示加载动画
+  readerLoader.style.display = 'flex';
   readerModal.classList.add('open');
 
-  // 清除之前的电子书实例
   if (currentBook) {
     currentBook.destroy();
     currentBook = null;
@@ -133,10 +120,10 @@ function openReader(title, url, isEpub) {
   epubArea.innerHTML = '';
   
   if (isEpub) {
-    // 使用 ePub.js 渲染分章阅读体验
     readerFrame.style.display = 'none';
     epubViewer.style.display = 'block';
     
+    // ePub.js 现已突破跨域防盗链，直接从同域名的 Vercel Edge Proxy 加载 EPUB 文件
     currentBook = ePub(url);
     currentRendition = currentBook.renderTo(epubArea, {
       width: "100%",
@@ -145,22 +132,21 @@ function openReader(title, url, isEpub) {
     });
     
     currentRendition.display().then(() => {
-      readerLoader.style.display = 'none'; // 隐藏加载动画
+      readerLoader.style.display = 'none';
     }).catch(err => {
       console.error(err);
-      readerLoader.querySelector('p').textContent = 'EPUB 加载失败，请尝试外部打开。';
+      readerLoader.querySelector('p').textContent = '跨域直连加载失败，请尝试外部打开。';
     });
 
     prevBtn.onclick = () => { if (currentRendition) currentRendition.prev(); };
     nextBtn.onclick = () => { if (currentRendition) currentRendition.next(); };
     
   } else {
-    // 降级：使用 iframe 渲染网页（全量加载）
     epubViewer.style.display = 'none';
     readerFrame.style.display = 'block';
     
     readerFrame.onload = function() {
-      readerLoader.style.display = 'none'; // 隐藏加载动画
+      readerLoader.style.display = 'none';
     };
     readerFrame.src = url;
   }
@@ -173,13 +159,13 @@ closeReaderBtn.addEventListener('click', () => {
     currentBook = null;
   }
   epubArea.innerHTML = '';
-  readerFrame.onload = null; // 清理事件
-  readerFrame.src = ''; // 清空 iframe，停止加载
+  readerFrame.onload = null;
+  readerFrame.src = '';
 });
 
-q.addEventListener('input', render);
-reloadBtn.addEventListener('click', () => {
-  alert('静态站不直接联网抓取。\n请在项目目录运行：\npython scripts/fetch_magazines.py\n然后刷新页面。');
+searchBtn.addEventListener('click', searchData);
+q.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') searchData();
 });
 
 bookshelfBtn.addEventListener('click', () => {
@@ -188,4 +174,10 @@ bookshelfBtn.addEventListener('click', () => {
   render();
 });
 
-loadData();
+if (getBookshelf().length > 0) {
+  showOnlyBookshelf = true;
+  bookshelfBtn.classList.add('active');
+  render();
+} else {
+  searchData();
+}
